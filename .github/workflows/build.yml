@@ -1,4 +1,4 @@
-name: ci
+name: build
 on:
   push:
     branches: [ main ]
@@ -18,5 +18,5 @@ jobs:
         run: ./build.sh
       - uses: actions/upload-artifact@v4
         with:
-          name: wintund-macos
+          name: wintund
           path: build/wintund.tar.gz
