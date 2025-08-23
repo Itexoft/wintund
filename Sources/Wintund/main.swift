@@ -1,6 +1,6 @@
 import Foundation
 import AppKit
-import ApplicationServices
+@preconcurrency import ApplicationServices
 import CoreGraphics
 import Dispatch
 
@@ -8,8 +8,8 @@ import Dispatch
 @MainActor
 struct Main {
     static func main() {
-        systemWide = AXUIElementCreateSystemWide()
-        globalConfig = loadConfig(path: {
+        Globals.systemWide = AXUIElementCreateSystemWide()
+        Globals.globalConfig = loadConfig(path: {
             var p: String?
             var it = CommandLine.arguments.makeIterator()
             _ = it.next()
@@ -25,8 +25,8 @@ struct Main {
             (CGEventMask(1) << CGEventType.leftMouseUp.rawValue) |
             (CGEventMask(1) << CGEventType.rightMouseDown.rawValue) |
             (CGEventMask(1) << CGEventType.rightMouseUp.rawValue)
-        eventTap = CGEvent.tapCreate(tap: .cghidEventTap, place: .headInsertEventTap, options: .defaultTap, eventsOfInterest: mask, callback: eventCallback, userInfo: nil)
-        if let tap = eventTap {
+        Globals.eventTap = CGEvent.tapCreate(tap: .cghidEventTap, place: .headInsertEventTap, options: .defaultTap, eventsOfInterest: mask, callback: eventCallback, userInfo: nil)
+        if let tap = Globals.eventTap {
             let src = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, tap, 0)
             CFRunLoopAddSource(CFRunLoopGetCurrent(), src, .commonModes)
             CGEvent.tapEnable(tap: tap, enable: true)

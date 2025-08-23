@@ -1,6 +1,6 @@
 import Foundation
 import AppKit
-import ApplicationServices
+@preconcurrency import ApplicationServices
 import CoreGraphics
 import Dispatch
 
@@ -60,7 +60,7 @@ func minimizeWindow(_ win: AXUIElement) -> Bool {
     let loc = event.location
     if let el = elementAtPoint(loc), let closeEl = findCloseButtonAncestor(el), let win = ancestorWindow(from: closeEl) {
         if minimizeWindow(win) {
-            swallowNextUp = true
+            Globals.swallowNextUp = true
             return nil
         }
     }
