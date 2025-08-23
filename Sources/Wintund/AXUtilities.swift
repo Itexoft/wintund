@@ -12,7 +12,7 @@ func attributeString(_ el: AXUIElement, _ key: CFString) -> String? {
 
 func attributeElement(_ el: AXUIElement, _ key: CFString) -> AXUIElement? {
     var v: CFTypeRef?
-    if AXUIElementCopyAttributeValue(el, key, &v) == .success, let e = v as? AXUIElement { return e }
+    if AXUIElementCopyAttributeValue(el, key, &v) == .success { return v as! AXUIElement }
     return nil
 }
 
@@ -25,8 +25,8 @@ func stringAttr(_ e: AXUIElement, _ attr: CFString) -> String? {
 
 func parent(_ e: AXUIElement) -> AXUIElement? {
     var v: CFTypeRef?
-    let r = AXUIElementCopyAttributeValue(e, kAXParentAttribute, &v)
-    if r == .success, let pe = v as? AXUIElement { return pe }
+    let r = AXUIElementCopyAttributeValue(e, kAXParentAttribute as CFString, &v)
+    if r == .success { return v as! AXUIElement }
     return nil
 }
 
@@ -34,7 +34,7 @@ func enclosingWindow(of e: AXUIElement) -> AXUIElement? {
     var cur: AXUIElement? = e
     var guardCount = 0
     while let c = cur, guardCount < 32 {
-        if stringAttr(c, kAXRoleAttribute) == "AXWindow" { return c }
+        if stringAttr(c, kAXRoleAttribute as CFString) == "AXWindow" { return c }
         cur = parent(c)
         guardCount += 1
     }
@@ -44,12 +44,13 @@ func enclosingWindow(of e: AXUIElement) -> AXUIElement? {
 func windowCenter(_ w: AXUIElement) -> CGPoint? {
     var posVal: CFTypeRef?
     var sizeVal: CFTypeRef?
-    if AXUIElementCopyAttributeValue(w, kAXPositionAttribute, &posVal) != .success { return nil }
-    if AXUIElementCopyAttributeValue(w, kAXSizeAttribute, &sizeVal) != .success { return nil }
+    if AXUIElementCopyAttributeValue(w, kAXPositionAttribute as CFString, &posVal) != .success { return nil }
+    if AXUIElementCopyAttributeValue(w, kAXSizeAttribute as CFString, &sizeVal) != .success { return nil }
     var pos = CGPoint.zero
     var size = CGSize.zero
-    if let pv = posVal as? AXValue, let sv = sizeVal as? AXValue,
-       AXValueGetType(pv) == .cgPoint, AXValueGetValue(pv, .cgPoint, &pos),
+    let pv = posVal as! AXValue
+    let sv = sizeVal as! AXValue
+    if AXValueGetType(pv) == .cgPoint, AXValueGetValue(pv, .cgPoint, &pos),
        AXValueGetType(sv) == .cgSize, AXValueGetValue(sv, .cgSize, &size) {
         return CGPoint(x: pos.x + size.width / 2.0, y: pos.y + size.height / 2.0)
     }
@@ -76,7 +77,7 @@ func setWindow(_ w: AXUIElement, to rect: NSRect) -> Bool {
     var pos = p
     var size = s
     guard let pv = AXValueCreate(.cgPoint, &pos), let sv = AXValueCreate(.cgSize, &size) else { return false }
-    let r1 = AXUIElementSetAttributeValue(w, kAXPositionAttribute, pv)
-    let r2 = AXUIElementSetAttributeValue(w, kAXSizeAttribute, sv)
+    let r1 = AXUIElementSetAttributeValue(w, kAXPositionAttribute as CFString, pv)
+    let r2 = AXUIElementSetAttributeValue(w, kAXSizeAttribute as CFString, sv)
     return r1 == .success && r2 == .success
 }

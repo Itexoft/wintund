@@ -22,12 +22,12 @@ func getDockRect() -> CGRect {
 
 func clamp(_ v: Float, _ lo: Float, _ hi: Float) -> Float { min(max(v, lo), hi) }
 
-var origTile: Float = 0
-var origOrient: Int32 = 0
-var origPin: Int32 = 0
-var changedPin = false
+@MainActor var origTile: Float = 0
+@MainActor var origOrient: Int32 = 0
+@MainActor var origPin: Int32 = 0
+@MainActor var changedPin = false
 
-func startFixDockIfNeeded() {
+@MainActor func startFixDockIfNeeded() {
     guard globalConfig.enableFixDock else { return }
     origTile = CoreDockGetTileSize()
     CoreDockGetOrientationAndPinning(&origOrient, &origPin)
