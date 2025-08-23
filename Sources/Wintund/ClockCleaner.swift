@@ -4,7 +4,7 @@ import AppKit
 import CoreGraphics
 import Dispatch
 
-func isClockHit(at point: CGPoint) -> Bool {
+@MainActor func isClockHit(at point: CGPoint) -> Bool {
     var element: AXUIElement?
     let res = AXUIElementCopyElementAtPosition(Globals.systemWide, Float(point.x), Float(point.y), &element)
     guard res == .success, let hit = element else { return false }
@@ -43,11 +43,11 @@ func hideAllVisibleApps() {
     hideAllVisibleApps()
 }
 
-func clockRightMouseDown(_ event: CGEvent) -> Unmanaged<CGEvent>? {
+@MainActor func clockRightMouseDown(_ event: CGEvent) -> Unmanaged<CGEvent>? {
     let loc = event.location
     if isClockHit(at: loc) {
         Globals.swallowNextMouseUp = true
-        Task { await cleanDesktop() }
+        Task { @MainActor in cleanDesktop() }
         return nil
     }
     return Unmanaged.passUnretained(event)

@@ -17,11 +17,11 @@ let package = Package(
                 .linkedFramework("ApplicationServices"),
                 .linkedFramework("CoreGraphics"),
                 .unsafeFlags([
-                    "-Xlinker", "-U", "-Xlinker", "_CoreDockGetTileSize",
-                    "-Xlinker", "-U", "-Xlinker", "_CoreDockSetTileSize",
-                    "-Xlinker", "-U", "-Xlinker", "_CoreDockGetRect",
-                    "-Xlinker", "-U", "-Xlinker", "_CoreDockGetOrientationAndPinning",
-                    "-Xlinker", "-U", "-Xlinker", "_CoreDockSetOrientationAndPinning"
+                    "-Wl,-U,_CoreDockGetTileSize",
+                    "-Wl,-U,_CoreDockSetTileSize",
+                    "-Wl,-U,_CoreDockGetRect",
+                    "-Wl,-U,_CoreDockGetOrientationAndPinning",
+                    "-Wl,-U,_CoreDockSetOrientationAndPinning"
                 ])
             ]
         )
