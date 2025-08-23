@@ -1,0 +1,22 @@
+name: release
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        required: true
+        type: string
+      name:
+        required: true
+        type: string
+jobs:
+  build:
+    uses: ./.github/workflows/build.yml
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ github.event.inputs.tag }}
+          name: ${{ github.event.inputs.name }}
