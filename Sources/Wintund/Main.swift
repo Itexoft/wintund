@@ -6,7 +6,7 @@ import Dispatch
 
 @main
 struct Main {
-    @MainActor static func main() {
+    static func main() {
         Globals.systemWide = AXUIElementCreateSystemWide()
         Globals.globalConfig = loadConfig(path: {
             var p: String?

@@ -2,8 +2,9 @@ import Foundation
 import AppKit
 @preconcurrency import ApplicationServices
 import CoreGraphics
+import Dispatch
 
-@MainActor func isClockHit(at point: CGPoint) -> Bool {
+func isClockHit(at point: CGPoint) -> Bool {
     var element: AXUIElement?
     let res = AXUIElementCopyElementAtPosition(Globals.systemWide, Float(point.x), Float(point.y), &element)
     guard res == .success, let hit = element else { return false }
@@ -17,7 +18,7 @@ import CoreGraphics
     return false
 }
 
-@MainActor func minimizeAllWindows() {
+func minimizeAllWindows() {
     for app in NSWorkspace.shared.runningApplications {
         if app.activationPolicy != .regular { continue }
         let appAX = AXUIElementCreateApplication(app.processIdentifier)
@@ -28,7 +29,7 @@ import CoreGraphics
     }
 }
 
-@MainActor func hideAllVisibleApps() {
+func hideAllVisibleApps() {
     let me = ProcessInfo.processInfo.processIdentifier
     for app in NSWorkspace.shared.runningApplications {
         if app.processIdentifier == me { continue }
@@ -37,16 +38,16 @@ import CoreGraphics
     }
 }
 
-@MainActor func cleanDesktop() {
+func cleanDesktop() {
     minimizeAllWindows()
     hideAllVisibleApps()
 }
 
-@MainActor func clockRightMouseDown(_ event: CGEvent) -> Unmanaged<CGEvent>? {
+func clockRightMouseDown(_ event: CGEvent) -> Unmanaged<CGEvent>? {
     let loc = event.location
     if isClockHit(at: loc) {
         Globals.swallowNextMouseUp = true
-        Task { @MainActor in cleanDesktop() }
+        DispatchQueue.main.async { cleanDesktop() }
         return nil
     }
     return Unmanaged.passUnretained(event)
