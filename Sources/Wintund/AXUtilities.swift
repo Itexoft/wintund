@@ -12,7 +12,7 @@ func attributeString(_ el: AXUIElement, _ key: CFString) -> String? {
 func attributeElement(_ el: AXUIElement, _ key: CFString) -> AXUIElement? {
     var v: CFTypeRef?
     if AXUIElementCopyAttributeValue(el, key, &v) == .success, let value = v, CFGetTypeID(value) == AXUIElementGetTypeID() {
-        return unsafeBitCast(value, to: AXUIElement.self)
+        return unsafeDowncast(value as AnyObject, to: AXUIElement.self)
     }
     return nil
 }
@@ -28,7 +28,7 @@ func parent(_ e: AXUIElement) -> AXUIElement? {
     var v: CFTypeRef?
     let r = AXUIElementCopyAttributeValue(e, kAXParentAttribute as CFString, &v)
     if r == .success, let value = v, CFGetTypeID(value) == AXUIElementGetTypeID() {
-        return unsafeBitCast(value, to: AXUIElement.self)
+        return unsafeDowncast(value as AnyObject, to: AXUIElement.self)
     }
     return nil
 }

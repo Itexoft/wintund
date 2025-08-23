@@ -5,9 +5,8 @@ import CoreGraphics
 import Dispatch
 
 @main
-@MainActor
 struct Main {
-    static func main() {
+    @MainActor static func main() {
         Globals.systemWide = AXUIElementCreateSystemWide()
         Globals.globalConfig = loadConfig(path: {
             var p: String?

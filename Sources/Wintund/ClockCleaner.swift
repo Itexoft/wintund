@@ -46,7 +46,7 @@ import CoreGraphics
     let loc = event.location
     if isClockHit(at: loc) {
         Globals.swallowNextMouseUp = true
-        Task { await cleanDesktop() }
+        Task { @MainActor in cleanDesktop() }
         return nil
     }
     return Unmanaged.passUnretained(event)
