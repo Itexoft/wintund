@@ -3,15 +3,15 @@ import AppKit
 @preconcurrency import ApplicationServices
 import CoreGraphics
 
-@MainActor(unsafe) enum Globals {
-    static var eventTap: CFMachPort?
-    static var swallowNextUp = false
-    static var swallowMouseUp = false
-    static var swallowNextMouseUp = false
-    static var systemWide: AXUIElement!
-    static var globalConfig: Config!
-    static var origTile: Float = 0
-    static var origOrient: Int32 = 0
-    static var origPin: Int32 = 0
-    static var changedPin = false
+enum Globals {
+    nonisolated(unsafe) static var eventTap: CFMachPort?
+    nonisolated(unsafe) static var swallowNextUp = false
+    nonisolated(unsafe) static var swallowMouseUp = false
+    nonisolated(unsafe) static var swallowNextMouseUp = false
+    nonisolated(unsafe) static var systemWide: AXUIElement!
+    nonisolated(unsafe) static var globalConfig: Config!
+    nonisolated(unsafe) static var origTile: Float = 0
+    nonisolated(unsafe) static var origOrient: Int32 = 0
+    nonisolated(unsafe) static var origPin: Int32 = 0
+    nonisolated(unsafe) static var changedPin = false
 }
