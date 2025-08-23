@@ -56,7 +56,7 @@ func minimizeWindow(_ win: AXUIElement) -> Bool {
     return true
 }
 
-func handleLeftMouseDown(_ event: CGEvent) -> Unmanaged<CGEvent>? {
+@MainActor func handleLeftMouseDown(_ event: CGEvent) -> Unmanaged<CGEvent>? {
     let loc = event.location
     if let el = elementAtPoint(loc), let closeEl = findCloseButtonAncestor(el), let win = ancestorWindow(from: closeEl) {
         if minimizeWindow(win) {

@@ -4,7 +4,7 @@ import ApplicationServices
 import CoreGraphics
 import Dispatch
 
-func isClockHit(at point: CGPoint) -> Bool {
+@MainActor func isClockHit(at point: CGPoint) -> Bool {
     var element: AXUIElement?
     let res = AXUIElementCopyElementAtPosition(systemWide, Float(point.x), Float(point.y), &element)
     guard res == .success, let hit = element else { return false }
@@ -18,7 +18,7 @@ func isClockHit(at point: CGPoint) -> Bool {
     return false
 }
 
-func minimizeAllWindows() {
+@MainActor func minimizeAllWindows() {
     for app in NSWorkspace.shared.runningApplications {
         if app.activationPolicy != .regular { continue }
         let appAX = AXUIElementCreateApplication(app.processIdentifier)
@@ -29,7 +29,7 @@ func minimizeAllWindows() {
     }
 }
 
-func hideAllVisibleApps() {
+@MainActor func hideAllVisibleApps() {
     let me = ProcessInfo.processInfo.processIdentifier
     for app in NSWorkspace.shared.runningApplications {
         if app.processIdentifier == me { continue }
@@ -38,12 +38,12 @@ func hideAllVisibleApps() {
     }
 }
 
-func cleanDesktop() {
+@MainActor func cleanDesktop() {
     minimizeAllWindows()
     hideAllVisibleApps()
 }
 
-func clockRightMouseDown(_ event: CGEvent) -> Unmanaged<CGEvent>? {
+@MainActor func clockRightMouseDown(_ event: CGEvent) -> Unmanaged<CGEvent>? {
     let loc = event.location
     if isClockHit(at: loc) {
         swallowNextMouseUp = true
