@@ -2,8 +2,8 @@ import Foundation
 import AppKit
 @preconcurrency import ApplicationServices
 import CoreGraphics
-import Dispatch
 
+@MainActor
 enum Globals {
     static var eventTap: CFMachPort?
     static var swallowNextUp = false

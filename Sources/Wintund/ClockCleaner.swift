@@ -2,7 +2,6 @@ import Foundation
 import AppKit
 @preconcurrency import ApplicationServices
 import CoreGraphics
-import Dispatch
 
 @MainActor func isClockHit(at point: CGPoint) -> Bool {
     var element: AXUIElement?
@@ -47,7 +46,7 @@ import Dispatch
     let loc = event.location
     if isClockHit(at: loc) {
         Globals.swallowNextMouseUp = true
-        DispatchQueue.global(qos: .userInitiated).async { cleanDesktop() }
+        Task { await cleanDesktop() }
         return nil
     }
     return Unmanaged.passUnretained(event)

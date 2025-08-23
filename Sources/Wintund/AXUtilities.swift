@@ -2,7 +2,6 @@ import Foundation
 import AppKit
 import ApplicationServices
 import CoreGraphics
-import Dispatch
 
 func attributeString(_ el: AXUIElement, _ key: CFString) -> String? {
     var v: CFTypeRef?
@@ -12,7 +11,9 @@ func attributeString(_ el: AXUIElement, _ key: CFString) -> String? {
 
 func attributeElement(_ el: AXUIElement, _ key: CFString) -> AXUIElement? {
     var v: CFTypeRef?
-    if AXUIElementCopyAttributeValue(el, key, &v) == .success, let e = v as? AXUIElement { return e }
+    if AXUIElementCopyAttributeValue(el, key, &v) == .success, let value = v, CFGetTypeID(value) == AXUIElementGetTypeID() {
+        return unsafeBitCast(value, to: AXUIElement.self)
+    }
     return nil
 }
 
@@ -26,7 +27,9 @@ func stringAttr(_ e: AXUIElement, _ attr: CFString) -> String? {
 func parent(_ e: AXUIElement) -> AXUIElement? {
     var v: CFTypeRef?
     let r = AXUIElementCopyAttributeValue(e, kAXParentAttribute as CFString, &v)
-    if r == .success { return v as! AXUIElement }
+    if r == .success, let value = v, CFGetTypeID(value) == AXUIElementGetTypeID() {
+        return unsafeBitCast(value, to: AXUIElement.self)
+    }
     return nil
 }
 
