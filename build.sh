@@ -1,6 +1,10 @@
 #!/bin/bash
-set -e
+set -euo pipefail
 cd "$(dirname "$0")"
+if [[ "$(uname -s)" != "Darwin" ]]; then
+  echo "error: macOS required" >&2
+  exit 2
+fi
 BUILD_DIR="$(pwd)/build"
 swift build -c release
 mkdir -p "$BUILD_DIR"

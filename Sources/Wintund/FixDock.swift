@@ -46,9 +46,9 @@ func clamp(_ v: Float, _ lo: Float, _ hi: Float) -> Float { min(max(v, lo), hi) 
         if rect.width <= 1 { return }
         let curW = rect.width
         let curF = CoreDockGetTileSize()
-        let err = curW - Globals.globalConfig.fixDockWidth
-        if abs(err) <= Globals.globalConfig.fixDockTolerance { return }
-        let ratio = Float(Globals.globalConfig.fixDockWidth / curW)
+        let err = curW - CGFloat(Globals.globalConfig.fixDockWidth)
+        if abs(err) <= CGFloat(Globals.globalConfig.fixDockTolerance) { return }
+        let ratio = Float(Globals.globalConfig.fixDockWidth / Double(curW))
         var nextF = clamp(curF * ratio, 0.01, 1.0)
         if abs(nextF - curF) < 0.001 { nextF = curF + (err > 0 ? 0.002 : -0.002) }
         CoreDockSetTileSize(nextF)

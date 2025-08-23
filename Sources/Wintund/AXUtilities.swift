@@ -12,7 +12,7 @@ func attributeString(_ el: AXUIElement, _ key: CFString) -> String? {
 
 func attributeElement(_ el: AXUIElement, _ key: CFString) -> AXUIElement? {
     var v: CFTypeRef?
-    if AXUIElementCopyAttributeValue(el, key, &v) == .success { return v as! AXUIElement }
+    if AXUIElementCopyAttributeValue(el, key, &v) == .success, let e = v as? AXUIElement { return e }
     return nil
 }
 

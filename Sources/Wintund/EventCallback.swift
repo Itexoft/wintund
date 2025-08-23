@@ -4,7 +4,6 @@ import AppKit
 import CoreGraphics
 import Dispatch
 
-@MainActor
 @convention(c)
 func eventCallback(proxy: CGEventTapProxy, type: CGEventType, event: CGEvent, refcon: UnsafeMutableRawPointer?) -> Unmanaged<CGEvent>? {
     if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {

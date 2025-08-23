@@ -10,6 +10,20 @@ let package = Package(
         .executable(name: "wintund", targets: ["Wintund"])
     ],
     targets: [
-        .executableTarget(name: "Wintund")
+        .executableTarget(
+            name: "Wintund",
+            linkerSettings: [
+                .linkedFramework("AppKit"),
+                .linkedFramework("ApplicationServices"),
+                .linkedFramework("CoreGraphics"),
+                .unsafeFlags([
+                    "-Wl,-U,_CoreDockGetTileSize",
+                    "-Wl,-U,_CoreDockSetTileSize",
+                    "-Wl,-U,_CoreDockGetRect",
+                    "-Wl,-U,_CoreDockGetOrientationAndPinning",
+                    "-Wl,-U,_CoreDockSetOrientationAndPinning"
+                ])
+            ]
+        )
     ]
 )
