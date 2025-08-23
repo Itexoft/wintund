@@ -1,5 +1,6 @@
 #!/bin/bash
 set -e
+cd "$(dirname "$0")"
 BUILD_DIR="$(pwd)/build"
 swift build -c release
 mkdir -p "$BUILD_DIR"
