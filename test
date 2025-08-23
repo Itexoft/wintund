@@ -1,0 +1,437 @@
+import Foundation
+import AppKit
+import ApplicationServices
+import CoreGraphics
+import Dispatch
+
+struct Ini {
+    var sections: [String: [String: String]]
+}
+
+func readIni(at path: String) -> Ini {
+    guard let data = try? String(contentsOfFile: path, encoding: .utf8) else { return Ini(sections: [:]) }
+    var current = ""
+    var map: [String: [String: String]] = [:]
+    for rawLine in data.components(separatedBy: .newlines) {
+        let line = rawLine.trimmingCharacters(in: .whitespaces)
+        if line.isEmpty { continue }
+        if line.hasPrefix(";") || line.hasPrefix("#") { continue }
+        if line.hasPrefix("[") && line.hasSuffix("]") {
+            current = String(line.dropFirst().dropLast()).trimmingCharacters(in: .whitespaces)
+            if map[current] == nil { map[current] = [:] }
+            continue
+        }
+        guard let eq = line.firstIndex(of: "=") else { continue }
+        let k = String(line[..<eq]).trimmingCharacters(in: .whitespaces)
+        let v = String(line[line.index(after: eq)...]).trimmingCharacters(in: .whitespaces)
+        if !current.isEmpty {
+            map[current]?[k.lowercased()] = v
+        }
+    }
+    return Ini(sections: map)
+}
+
+func parseBool(_ v: String?) -> Bool {
+    guard let s = v?.lowercased() else { return false }
+    if ["1","true","yes","on","y"].contains(s) { return true }
+    if ["0","false","no","off","n"].contains(s) { return false }
+    return false
+}
+
+func parseDouble(_ v: String?, _ def: Double) -> Double {
+    guard let s = v, let d = Double(s) else { return def }
+    return d
+}
+
+func parseString(_ v: String?, _ def: String) -> String {
+    guard let s = v, !s.isEmpty else { return def }
+    return s
+}
+
+struct Config {
+    var enableCloseMinimizer: Bool
+    var enableGreenZoom: Bool
+    var enableClockCleaner: Bool
+    var enableFixDock: Bool
+    var fixDockWidth: CGFloat
+    var fixDockPin: String
+    var fixDockTolerance: CGFloat
+    var fixDockInterval: TimeInterval
+}
+
+func loadConfig(path: String?) -> Config {
+    var ini = Ini(sections: [:])
+    if let p = path, FileManager.default.fileExists(atPath: p) { ini = readIni(at: p) }
+    else {
+        let exe = CommandLine.arguments.first ?? ""
+        let url = URL(fileURLWithPath: exe).standardized
+        let near = url.deletingLastPathComponent().appendingPathComponent("config.ini").path
+        if FileManager.default.fileExists(atPath: near) { ini = readIni(at: near) }
+    }
+    let c1 = ini.sections["CloseButtonMinimizer"] ?? [:]
+    let c2 = ini.sections["GreenZoomDaemon"] ?? [:]
+    let c3 = ini.sections["ClockDesktopDaemon"] ?? [:]
+    let c4 = ini.sections["FixDock"] ?? [:]
+    let enableClose = c1.isEmpty ? true : parseBool(c1["enabled"])
+    let enableGreen = c2.isEmpty ? true : parseBool(c2["enabled"])
+    let enableClock = c3.isEmpty ? true : parseBool(c3["enabled"])
+    let enableDock = parseBool(c4["enabled"])
+    let width = CGFloat(parseDouble(c4["width"], 0))
+    let pin = parseString(c4["pin"], "ignore")
+    let tol = CGFloat(parseDouble(c4["tolerance"], 2))
+    let interval = parseDouble(c4["interval"], 0.15)
+    return Config(enableCloseMinimizer: enableClose, enableGreenZoom: enableGreen, enableClockCleaner: enableClock, enableFixDock: enableDock && width > 0, fixDockWidth: width, fixDockPin: pin, fixDockTolerance: tol, fixDockInterval: interval)
+}
+
+var eventTap: CFMachPort?
+var swallowNextUp = false
+var swallowMouseUp = false
+var swallowNextMouseUp = false
+let systemWide = AXUIElementCreateSystemWide()
+var globalConfig = loadConfig(path: {
+    var p: String?
+    var it = CommandLine.arguments.makeIterator()
+    _ = it.next()
+    while let a = it.next() {
+        if a == "--config", let v = it.next() { p = v; break }
+    }
+    return p
+}())
+
+func attributeString(_ el: AXUIElement, _ key: CFString) -> String? {
+    var v: CFTypeRef?
+    if AXUIElementCopyAttributeValue(el, key, &v) == .success { return v as? String }
+    return nil
+}
+
+func attributeElement(_ el: AXUIElement, _ key: CFString) -> AXUIElement? {
+    var v: CFTypeRef?
+    if AXUIElementCopyAttributeValue(el, key, &v) == .success, let e = v as? AXUIElement { return e }
+    return nil
+}
+
+func isCloseButton(_ el: AXUIElement) -> Bool {
+    if let subrole = attributeString(el, kAXSubroleAttribute as CFString) { return subrole == "AXCloseButton" }
+    return false
+}
+
+func isWindow(_ el: AXUIElement) -> Bool {
+    if let role = attributeString(el, kAXRoleAttribute as CFString) { return role == "AXWindow" }
+    return false
+}
+
+func ancestorWindow(from el: AXUIElement) -> AXUIElement? {
+    var current: AXUIElement? = el
+    var guardCount = 0
+    while let c = current, guardCount < 32 {
+        if isWindow(c) { return c }
+        current = attributeElement(c, kAXParentAttribute as CFString)
+        guardCount += 1
+    }
+    return nil
+}
+
+func findCloseButtonAncestor(_ el: AXUIElement) -> AXUIElement? {
+    var current: AXUIElement? = el
+    var guardCount = 0
+    while let c = current, guardCount < 32 {
+        if isCloseButton(c) { return c }
+        current = attributeElement(c, kAXParentAttribute as CFString)
+        guardCount += 1
+    }
+    return nil
+}
+
+func elementAtPoint(_ p: CGPoint) -> AXUIElement? {
+    let sys = AXUIElementCreateSystemWide()
+    var el: AXUIElement?
+    _ = AXUIElementCopyElementAtPosition(sys, Float(p.x), Float(p.y), &el)
+    return el
+}
+
+func minimizeWindow(_ win: AXUIElement) -> Bool {
+    let r = AXUIElementSetAttributeValue(win, kAXMinimizedAttribute as CFString, kCFBooleanTrue)
+    if r == .success { return true }
+    let src = CGEventSource(stateID: .hidSystemState)
+    let down = CGEvent(keyboardEventSource: src, virtualKey: 0x2E, keyDown: true)
+    let up = CGEvent(keyboardEventSource: src, virtualKey: 0x2E, keyDown: false)
+    down?.flags = .maskCommand
+    up?.flags = .maskCommand
+    down?.post(tap: .cghidEventTap)
+    up?.post(tap: .cghidEventTap)
+    return true
+}
+
+func handleLeftMouseDown(_ event: CGEvent) -> Unmanaged<CGEvent>? {
+    let loc = event.location
+    if let el = elementAtPoint(loc), let closeEl = findCloseButtonAncestor(el), let win = ancestorWindow(from: closeEl) {
+        if minimizeWindow(win) {
+            swallowNextUp = true
+            return nil
+        }
+    }
+    return Unmanaged.passUnretained(event)
+}
+
+func stringAttr(_ e: AXUIElement, _ attr: CFString) -> String? {
+    var v: CFTypeRef?
+    let r = AXUIElementCopyAttributeValue(e, attr, &v)
+    if r == .success, let s = v as? String { return s }
+    return nil
+}
+
+func parent(_ e: AXUIElement) -> AXUIElement? {
+    var v: CFTypeRef?
+    let r = AXUIElementCopyAttributeValue(e, kAXParentAttribute, &v)
+    if r == .success, let pe = v as? AXUIElement { return pe }
+    return nil
+}
+
+func enclosingWindow(of e: AXUIElement) -> AXUIElement? {
+    var cur: AXUIElement? = e
+    var guardCount = 0
+    while let c = cur, guardCount < 32 {
+        if stringAttr(c, kAXRoleAttribute) == "AXWindow" { return c }
+        cur = parent(c)
+        guardCount += 1
+    }
+    return nil
+}
+
+func windowCenter(_ w: AXUIElement) -> CGPoint? {
+    var posVal: CFTypeRef?
+    var sizeVal: CFTypeRef?
+    if AXUIElementCopyAttributeValue(w, kAXPositionAttribute, &posVal) != .success { return nil }
+    if AXUIElementCopyAttributeValue(w, kAXSizeAttribute, &sizeVal) != .success { return nil }
+    var pos = CGPoint.zero
+    var size = CGSize.zero
+    if let pv = posVal as? AXValue, let sv = sizeVal as? AXValue,
+       AXValueGetType(pv) == .cgPoint, AXValueGetValue(pv, .cgPoint, &pos),
+       AXValueGetType(sv) == .cgSize, AXValueGetValue(sv, .cgSize, &size) {
+        return CGPoint(x: pos.x + size.width / 2.0, y: pos.y + size.height / 2.0)
+    }
+    return nil
+}
+
+func visibleFrameForPoint(_ p: CGPoint) -> NSRect? {
+    let screens = NSScreen.screens
+    var found: NSScreen?
+    for s in screens { if s.frame.contains(p) { found = s; break } }
+    if found == nil { found = NSScreen.main }
+    guard let screen = found else { return nil }
+    return screen.visibleFrame
+}
+
+func convertNSRectToAX(_ r: NSRect) -> (CGPoint, CGSize) {
+    let maxY = NSScreen.screens.map { $0.frame.maxY }.max() ?? 0
+    let axY = maxY - (r.origin.y + r.size.height)
+    return (CGPoint(x: r.origin.x, y: axY), CGSize(width: r.size.width, height: r.size.height))
+}
+
+func setWindow(_ w: AXUIElement, to rect: NSRect) -> Bool {
+    let (p, s) = convertNSRectToAX(rect)
+    var pos = p
+    var size = s
+    guard let pv = AXValueCreate(.cgPoint, &pos), let sv = AXValueCreate(.cgSize, &size) else { return false }
+    let r1 = AXUIElementSetAttributeValue(w, kAXPositionAttribute, pv)
+    let r2 = AXUIElementSetAttributeValue(w, kAXSizeAttribute, sv)
+    return r1 == .success && r2 == .success
+}
+
+func performFill(on window: AXUIElement) -> Bool {
+    guard let center = windowCenter(window), let vis = visibleFrameForPoint(center) else { return false }
+    return setWindow(window, to: vis)
+}
+
+func synthesizeAltClick(at p: CGPoint) {
+    let optDown = CGEvent(keyboardEventSource: nil, virtualKey: 58, keyDown: true)
+    optDown?.post(tap: .cghidEventTap)
+    let down = CGEvent(mouseEventSource: nil, mouseType: .leftMouseDown, mouseCursorPosition: p, mouseButton: .left)
+    down?.flags = [.maskAlternate]
+    down?.post(tap: .cghidEventTap)
+    let up = CGEvent(mouseEventSource: nil, mouseType: .leftMouseUp, mouseCursorPosition: p, mouseButton: .left)
+    up?.flags = [.maskAlternate]
+    up?.post(tap: .cghidEventTap)
+    let optUp = CGEvent(keyboardEventSource: nil, virtualKey: 58, keyDown: false)
+    optUp?.post(tap: .cghidEventTap)
+}
+
+func greenZoomLeftMouseDown(_ event: CGEvent) -> Unmanaged<CGEvent>? {
+    if event.flags.contains(.maskAlternate) { return Unmanaged.passUnretained(event) }
+    let loc = event.location
+    var elem: AXUIElement?
+    _ = AXUIElementCopyElementAtPosition(systemWide, Float(loc.x), Float(loc.y), &elem)
+    if let e = elem, stringAttr(e, kAXSubroleAttribute) == "AXFullScreenButton" {
+        if let win = enclosingWindow(of: e), performFill(on: win) {
+            swallowMouseUp = true
+            return nil
+        }
+        swallowMouseUp = true
+        synthesizeAltClick(at: loc)
+        return nil
+    }
+    return Unmanaged.passUnretained(event)
+}
+
+func isClockHit(at point: CGPoint) -> Bool {
+    var element: AXUIElement?
+    let res = AXUIElementCopyElementAtPosition(systemWide, Float(point.x), Float(point.y), &element)
+    guard res == .success, let hit = element else { return false }
+    var current: AXUIElement? = hit
+    var depth = 0
+    while let e = current, depth < 20 {
+        if let ident = attributeString(e, kAXIdentifierAttribute as CFString), ident == "com.apple.menuextra.clock" { return true }
+        current = attributeElement(e, kAXParentAttribute as CFString)
+        depth += 1
+    }
+    return false
+}
+
+func minimizeAllWindows() {
+    for app in NSWorkspace.shared.runningApplications {
+        if app.activationPolicy != .regular { continue }
+        let appAX = AXUIElementCreateApplication(app.processIdentifier)
+        var value: CFTypeRef?
+        if AXUIElementCopyAttributeValue(appAX, kAXWindowsAttribute as CFString, &value) == .success, let windows = value as? [AXUIElement] {
+            for w in windows { AXUIElementSetAttributeValue(w, kAXMinimizedAttribute as CFString, kCFBooleanTrue) }
+        }
+    }
+}
+
+func hideAllVisibleApps() {
+    let me = ProcessInfo.processInfo.processIdentifier
+    for app in NSWorkspace.shared.runningApplications {
+        if app.processIdentifier == me { continue }
+        if app.activationPolicy != .regular { continue }
+        if !app.isHidden { _ = app.hide() }
+    }
+}
+
+func cleanDesktop() {
+    minimizeAllWindows()
+    hideAllVisibleApps()
+}
+
+func clockRightMouseDown(_ event: CGEvent) -> Unmanaged<CGEvent>? {
+    let loc = event.location
+    if isClockHit(at: loc) {
+        swallowNextMouseUp = true
+        DispatchQueue.global(qos: .userInitiated).async { cleanDesktop() }
+        return nil
+    }
+    return Unmanaged.passUnretained(event)
+}
+
+@_silgen_name("CoreDockGetTileSize") func CoreDockGetTileSize() -> Float
+@_silgen_name("CoreDockSetTileSize") func CoreDockSetTileSize(_ tileSize: Float)
+@_silgen_name("CoreDockGetRect") func CoreDockGetRect(_ outRect: UnsafeMutablePointer<CGRect>)
+@_silgen_name("CoreDockGetOrientationAndPinning") func CoreDockGetOrientationAndPinning(_ outOrientation: UnsafeMutablePointer<Int32>, _ outPinning: UnsafeMutablePointer<Int32>)
+@_silgen_name("CoreDockSetOrientationAndPinning") func CoreDockSetOrientationAndPinning(_ orientation: Int32, _ pinning: Int32)
+
+let kCoreDockPinningStart: Int32 = 1
+let kCoreDockPinningMiddle: Int32 = 2
+let kCoreDockPinningEnd: Int32 = 3
+
+func getDockRect() -> CGRect {
+    var r = CGRect.zero
+    CoreDockGetRect(&r)
+    return r
+}
+
+func clamp(_ v: Float, _ lo: Float, _ hi: Float) -> Float { min(max(v, lo), hi) }
+
+var origTile: Float = 0
+var origOrient: Int32 = 0
+var origPin: Int32 = 0
+var changedPin = false
+
+func startFixDockIfNeeded() {
+    guard globalConfig.enableFixDock else { return }
+    origTile = CoreDockGetTileSize()
+    CoreDockGetOrientationAndPinning(&origOrient, &origPin)
+    if globalConfig.fixDockPin == "start" { CoreDockSetOrientationAndPinning(origOrient, kCoreDockPinningStart); changedPin = true }
+    else if globalConfig.fixDockPin == "middle" { CoreDockSetOrientationAndPinning(origOrient, kCoreDockPinningMiddle); changedPin = true }
+    else if globalConfig.fixDockPin == "end" { CoreDockSetOrientationAndPinning(origOrient, kCoreDockPinningEnd); changedPin = true }
+    for s in [SIGINT, SIGTERM, SIGHUP, SIGQUIT] {
+        signal(s, SIG_IGN)
+        let src = DispatchSource.makeSignalSource(signal: s, queue: .main)
+        src.setEventHandler {
+            CoreDockSetTileSize(origTile)
+            if changedPin { CoreDockSetOrientationAndPinning(origOrient, origPin) }
+            exit(0)
+        }
+        src.resume()
+    }
+    func step() {
+        let rect = getDockRect()
+        if rect.width <= 1 { return }
+        let curW = rect.width
+        let curF = CoreDockGetTileSize()
+        let err = curW - globalConfig.fixDockWidth
+        if abs(err) <= globalConfig.fixDockTolerance { return }
+        let ratio = Float(globalConfig.fixDockWidth / curW)
+        var nextF = clamp(curF * ratio, 0.01, 1.0)
+        if abs(nextF - curF) < 0.001 { nextF = curF + (err > 0 ? 0.002 : -0.002) }
+        CoreDockSetTileSize(nextF)
+    }
+    for _ in 0..<8 { step(); usleep(60000) }
+    let timer = DispatchSource.makeTimerSource(queue: .main)
+    timer.schedule(deadline: .now() + globalConfig.fixDockInterval, repeating: globalConfig.fixDockInterval)
+    timer.setEventHandler { step() }
+    timer.resume()
+}
+
+private func eventCallback(proxy: CGEventTapProxy, type: CGEventType, event: CGEvent, refcon: UnsafeMutableRawPointer?) -> Unmanaged<CGEvent>? {
+    if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
+        if let tap = eventTap { CGEvent.tapEnable(tap: tap, enable: true) }
+        return Unmanaged.passUnretained(event)
+    }
+    if type == .leftMouseDown {
+        if globalConfig.enableCloseMinimizer {
+            if handleLeftMouseDown(event) == nil { return nil }
+        }
+        if globalConfig.enableGreenZoom {
+            if greenZoomLeftMouseDown(event) == nil { return nil }
+        }
+        return Unmanaged.passUnretained(event)
+    }
+    if type == .leftMouseUp {
+        if swallowNextUp { swallowNextUp = false; return nil }
+        if swallowMouseUp { swallowMouseUp = false; return nil }
+        return Unmanaged.passUnretained(event)
+    }
+    if type == .rightMouseDown {
+        if globalConfig.enableClockCleaner {
+            if clockRightMouseDown(event) == nil { return nil }
+        }
+        return Unmanaged.passUnretained(event)
+    }
+    if type == .rightMouseUp {
+        if swallowNextMouseUp { swallowNextMouseUp = false; return nil }
+        return Unmanaged.passUnretained(event)
+    }
+    return Unmanaged.passUnretained(event)
+}
+
+@main
+struct Main {
+    static func main() {
+        _ = AXIsProcessTrustedWithOptions([kAXTrustedCheckOptionPrompt as String: true] as CFDictionary)
+        let mask: CGEventMask =
+            (CGEventMask(1) << CGEventType.leftMouseDown.rawValue) |
+            (CGEventMask(1) << CGEventType.leftMouseUp.rawValue) |
+            (CGEventMask(1) << CGEventType.rightMouseDown.rawValue) |
+            (CGEventMask(1) << CGEventType.rightMouseUp.rawValue)
+        eventTap = CGEventTapCreate(.cghidEventTap, .headInsertEventTap, .defaultTap, mask, eventCallback, nil)
+        if let tap = eventTap {
+            let src = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, tap, 0)
+            CFRunLoopAddSource(CFRunLoopGetCurrent(), src, .commonModes)
+            CGEvent.tapEnable(tap: tap, enable: true)
+            startFixDockIfNeeded()
+            CFRunLoopRun()
+        } else {
+            fputs("failed to create event tap\n", stderr)
+            exit(1)
+        }
+    }
+}
