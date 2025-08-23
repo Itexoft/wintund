@@ -1,12 +1,12 @@
 import Foundation
 import AppKit
-import ApplicationServices
+@preconcurrency import ApplicationServices
 import CoreGraphics
 import Dispatch
 
 @MainActor func isClockHit(at point: CGPoint) -> Bool {
     var element: AXUIElement?
-    let res = AXUIElementCopyElementAtPosition(systemWide, Float(point.x), Float(point.y), &element)
+    let res = AXUIElementCopyElementAtPosition(Globals.systemWide, Float(point.x), Float(point.y), &element)
     guard res == .success, let hit = element else { return false }
     var current: AXUIElement? = hit
     var depth = 0
@@ -46,7 +46,7 @@ import Dispatch
 @MainActor func clockRightMouseDown(_ event: CGEvent) -> Unmanaged<CGEvent>? {
     let loc = event.location
     if isClockHit(at: loc) {
-        swallowNextMouseUp = true
+        Globals.swallowNextMouseUp = true
         DispatchQueue.global(qos: .userInitiated).async { cleanDesktop() }
         return nil
     }

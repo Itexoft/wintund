@@ -1,6 +1,6 @@
 import Foundation
 import AppKit
-import ApplicationServices
+@preconcurrency import ApplicationServices
 import CoreGraphics
 import Dispatch
 
@@ -26,13 +26,13 @@ func synthesizeAltClick(at p: CGPoint) {
     if event.flags.contains(.maskAlternate) { return Unmanaged.passUnretained(event) }
     let loc = event.location
     var elem: AXUIElement?
-    _ = AXUIElementCopyElementAtPosition(systemWide, Float(loc.x), Float(loc.y), &elem)
+    _ = AXUIElementCopyElementAtPosition(Globals.systemWide, Float(loc.x), Float(loc.y), &elem)
     if let e = elem, stringAttr(e, kAXSubroleAttribute as CFString) == "AXFullScreenButton" {
         if let win = enclosingWindow(of: e), performFill(on: win) {
-            swallowMouseUp = true
+            Globals.swallowMouseUp = true
             return nil
         }
-        swallowMouseUp = true
+        Globals.swallowMouseUp = true
         synthesizeAltClick(at: loc)
         return nil
     }

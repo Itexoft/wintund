@@ -1,12 +1,18 @@
 import Foundation
 import AppKit
-import ApplicationServices
+@preconcurrency import ApplicationServices
 import CoreGraphics
 import Dispatch
 
-@MainActor var eventTap: CFMachPort?
-@MainActor var swallowNextUp = false
-@MainActor var swallowMouseUp = false
-@MainActor var swallowNextMouseUp = false
-@MainActor var systemWide: AXUIElement!
-@MainActor var globalConfig: Config!
+enum Globals {
+    @MainActor static var eventTap: CFMachPort?
+    @MainActor static var swallowNextUp = false
+    @MainActor static var swallowMouseUp = false
+    @MainActor static var swallowNextMouseUp = false
+    @MainActor static var systemWide: AXUIElement!
+    @MainActor static var globalConfig: Config!
+    @MainActor static var origTile: Float = 0
+    @MainActor static var origOrient: Int32 = 0
+    @MainActor static var origPin: Int32 = 0
+    @MainActor static var changedPin = false
+}
