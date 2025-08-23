@@ -3,7 +3,7 @@ import AppKit
 @preconcurrency import ApplicationServices
 @preconcurrency import CoreGraphics
 
-func eventCallback(proxy: CGEventTapProxy, type: CGEventType, event: CGEvent, refcon: UnsafeMutableRawPointer?) -> Unmanaged<CGEvent>? {
+let eventCallback: CGEventTapCallBack = { proxy, type, event, refcon in
     if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
         if let tap = Globals.eventTap { CGEvent.tapEnable(tap: tap, enable: true) }
         return Unmanaged.passUnretained(event)

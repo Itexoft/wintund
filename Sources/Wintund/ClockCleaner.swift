@@ -38,7 +38,7 @@ func hideAllVisibleApps() {
     }
 }
 
-func cleanDesktop() {
+@MainActor func cleanDesktop() {
     minimizeAllWindows()
     hideAllVisibleApps()
 }
@@ -47,7 +47,7 @@ func clockRightMouseDown(_ event: CGEvent) -> Unmanaged<CGEvent>? {
     let loc = event.location
     if isClockHit(at: loc) {
         Globals.swallowNextMouseUp = true
-        DispatchQueue.main.async { cleanDesktop() }
+        Task { await cleanDesktop() }
         return nil
     }
     return Unmanaged.passUnretained(event)
