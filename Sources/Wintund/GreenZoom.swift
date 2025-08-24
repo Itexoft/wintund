@@ -1,8 +1,6 @@
-import Foundation
 import AppKit
-@preconcurrency import ApplicationServices
+import ApplicationServices
 import CoreGraphics
-import Dispatch
 
 func performFill(on window: AXUIElement) -> Bool {
     guard let center = windowCenter(window), let vis = visibleFrameForPoint(center) else { return false }
@@ -22,12 +20,13 @@ func synthesizeAltClick(at p: CGPoint) {
     optUp?.post(tap: .cghidEventTap)
 }
 
-@MainActor func greenZoomLeftMouseDown(_ event: CGEvent) -> Unmanaged<CGEvent>? {
+@MainActor
+func greenZoomLeftMouseDown(_ event: CGEvent) -> Unmanaged<CGEvent>? {
     if event.flags.contains(.maskAlternate) { return Unmanaged.passUnretained(event) }
     let loc = event.location
     var elem: AXUIElement?
     _ = AXUIElementCopyElementAtPosition(Globals.systemWide, Float(loc.x), Float(loc.y), &elem)
-    if let e = elem, stringAttr(e, kAXSubroleAttribute as CFString) == "AXFullScreenButton" {
+    if let e = elem, stringAttr(e, kAXSubroleAttribute) == "AXFullScreenButton" {
         if let win = enclosingWindow(of: e), performFill(on: win) {
             Globals.swallowMouseUp = true
             return nil

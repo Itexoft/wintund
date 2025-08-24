@@ -1,8 +1,4 @@
 import Foundation
-import AppKit
-import ApplicationServices
-import CoreGraphics
-import Dispatch
 
 struct Ini {
     var sections: [String: [String: String]]
@@ -53,9 +49,9 @@ struct Config {
     var enableGreenZoom: Bool
     var enableClockCleaner: Bool
     var enableFixDock: Bool
-    var fixDockWidth: CGFloat
+    var fixDockWidth: Double
     var fixDockPin: String
-    var fixDockTolerance: CGFloat
+    var fixDockTolerance: Double
     var fixDockInterval: TimeInterval
 }
 
@@ -76,9 +72,18 @@ func loadConfig(path: String?) -> Config {
     let enableGreen = c2.isEmpty ? true : parseBool(c2["enabled"])
     let enableClock = c3.isEmpty ? true : parseBool(c3["enabled"])
     let enableDock = parseBool(c4["enabled"])
-    let width = CGFloat(parseDouble(c4["width"], 0))
+    let width = parseDouble(c4["width"], 0)
     let pin = parseString(c4["pin"], "ignore")
-    let tol = CGFloat(parseDouble(c4["tolerance"], 2))
+    let tol = parseDouble(c4["tolerance"], 2)
     let interval = parseDouble(c4["interval"], 0.15)
     return Config(enableCloseMinimizer: enableClose, enableGreenZoom: enableGreen, enableClockCleaner: enableClock, enableFixDock: enableDock && width > 0, fixDockWidth: width, fixDockPin: pin, fixDockTolerance: tol, fixDockInterval: interval)
+}
+
+func resolveConfigPath() -> String? {
+    var it = CommandLine.arguments.makeIterator()
+    _ = it.next()
+    while let a = it.next() {
+        if a == "--config", let v = it.next() { return v }
+    }
+    return nil
 }
