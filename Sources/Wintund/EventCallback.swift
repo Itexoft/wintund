@@ -1,9 +1,10 @@
 import Foundation
+import AppKit
 @preconcurrency import ApplicationServices
-@preconcurrency import CoreGraphics
-import Dispatch
+import CoreGraphics
 
-func eventCallback(proxy: CGEventTapProxy, type: CGEventType, event: CGEvent, refcon: UnsafeMutableRawPointer?) -> Unmanaged<CGEvent>? {
+@MainActor
+func handleEvent(type: CGEventType, event: CGEvent) -> Unmanaged<CGEvent>? {
     if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
         if let tap = Globals.eventTap { CGEvent.tapEnable(tap: tap, enable: true) }
         return Unmanaged.passUnretained(event)
@@ -33,4 +34,9 @@ func eventCallback(proxy: CGEventTapProxy, type: CGEventType, event: CGEvent, re
         return Unmanaged.passUnretained(event)
     }
     return Unmanaged.passUnretained(event)
+}
+
+@convention(c)
+func eventCallback(proxy: CGEventTapProxy, type: CGEventType, event: CGEvent, refcon: UnsafeMutableRawPointer?) -> Unmanaged<CGEvent>? {
+    return MainActor.assumeIsolated { handleEvent(type: type, event: event) }
 }

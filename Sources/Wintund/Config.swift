@@ -78,3 +78,12 @@ func loadConfig(path: String?) -> Config {
     let interval = parseDouble(c4["interval"], 0.15)
     return Config(enableCloseMinimizer: enableClose, enableGreenZoom: enableGreen, enableClockCleaner: enableClock, enableFixDock: enableDock && width > 0, fixDockWidth: width, fixDockPin: pin, fixDockTolerance: tol, fixDockInterval: interval)
 }
+
+func resolveConfigPath() -> String? {
+    var it = CommandLine.arguments.makeIterator()
+    _ = it.next()
+    while let a = it.next() {
+        if a == "--config", let v = it.next() { return v }
+    }
+    return nil
+}

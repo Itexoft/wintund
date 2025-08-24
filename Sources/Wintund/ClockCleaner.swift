@@ -1,9 +1,9 @@
-import Foundation
 import AppKit
-@preconcurrency import ApplicationServices
+import ApplicationServices
 import CoreGraphics
 import Dispatch
 
+@MainActor
 func isClockHit(at point: CGPoint) -> Bool {
     var element: AXUIElement?
     let res = AXUIElementCopyElementAtPosition(Globals.systemWide, Float(point.x), Float(point.y), &element)
@@ -38,11 +38,13 @@ func hideAllVisibleApps() {
     }
 }
 
+@MainActor
 func cleanDesktop() {
     minimizeAllWindows()
     hideAllVisibleApps()
 }
 
+@MainActor
 func clockRightMouseDown(_ event: CGEvent) -> Unmanaged<CGEvent>? {
     let loc = event.location
     if isClockHit(at: loc) {
