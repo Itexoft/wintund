@@ -22,7 +22,7 @@ func synthesizeAltClick(at p: CGPoint) {
     optUp?.post(tap: .cghidEventTap)
 }
 
-@MainActor func greenZoomLeftMouseDown(_ event: CGEvent) -> Unmanaged<CGEvent>? {
+func greenZoomLeftMouseDown(_ event: CGEvent) -> Unmanaged<CGEvent>? {
     if event.flags.contains(.maskAlternate) { return Unmanaged.passUnretained(event) }
     let loc = event.location
     var elem: AXUIElement?
