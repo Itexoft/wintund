@@ -6,7 +6,7 @@ if [[ "$(uname -s)" != "Darwin" ]]; then
   exit 2
 fi
 BUILD_DIR="$(pwd)/build"
-swift build -c release
+swift build -c release --arch arm64
 mkdir -p "$BUILD_DIR"
 cp .build/release/wintund "$BUILD_DIR"/
 cp config.ini "$BUILD_DIR"/
