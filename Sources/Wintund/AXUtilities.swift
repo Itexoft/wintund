@@ -1,86 +1,105 @@
 import Foundation
 import AppKit
-import ApplicationServices
-import CoreGraphics
+@preconcurrency import ApplicationServices
+@preconcurrency import CoreGraphics
 
+@MainActor
 func attributeString(_ el: AXUIElement, _ key: CFString) -> String? {
     var v: CFTypeRef?
-    if AXUIElementCopyAttributeValue(el, key, &v) == .success { return v as? String }
+    if AXUIElementCopyAttributeValue(el, key, &v) == .success, let value = v {
+        if let s = value as? String { return s }
+        if CFGetTypeID(value) == CFStringGetTypeID() { return (unsafeDowncast(value, to: CFString.self)) as String }
+    }
     return nil
 }
 
+@MainActor
 func attributeElement(_ el: AXUIElement, _ key: CFString) -> AXUIElement? {
     var v: CFTypeRef?
-    if AXUIElementCopyAttributeValue(el, key, &v) == .success, let value = v, CFGetTypeID(value) == AXUIElementGetTypeID() {
-        return unsafeDowncast(value as AnyObject, to: AXUIElement.self)
+    if AXUIElementCopyAttributeValue(el, key, &v) == .success, let value = v {
+        if CFGetTypeID(value) == AXUIElementGetTypeID() { return unsafeDowncast(value, to: AXUIElement.self) }
     }
     return nil
 }
 
-func stringAttr(_ e: AXUIElement, _ attr: CFString) -> String? {
+@MainActor
+func attributeArray(_ el: AXUIElement, _ key: CFString) -> [AXUIElement]? {
     var v: CFTypeRef?
-    let r = AXUIElementCopyAttributeValue(e, attr, &v)
-    if r == .success, let s = v as? String { return s }
-    return nil
-}
-
-func parent(_ e: AXUIElement) -> AXUIElement? {
-    var v: CFTypeRef?
-    let r = AXUIElementCopyAttributeValue(e, kAXParentAttribute as CFString, &v)
-    if r == .success, let value = v, CFGetTypeID(value) == AXUIElementGetTypeID() {
-        return unsafeDowncast(value as AnyObject, to: AXUIElement.self)
+    if AXUIElementCopyAttributeValue(el, key, &v) != .success || v == nil { return nil }
+    let value = v!
+    if CFGetTypeID(value) != CFArrayGetTypeID() { return nil }
+    let arr = unsafeDowncast(value, to: CFArray.self)
+    let count = CFArrayGetCount(arr)
+    var result: [AXUIElement] = []
+    result.reserveCapacity(count)
+    for i in 0..<count {
+        guard let raw = CFArrayGetValueAtIndex(arr, i) else { continue }
+        let any = Unmanaged<AnyObject>.fromOpaque(raw).takeUnretainedValue()
+        if CFGetTypeID(any) == AXUIElementGetTypeID() {
+            result.append(unsafeDowncast(any, to: AXUIElement.self))
+        }
     }
-    return nil
+    return result
 }
 
-func enclosingWindow(of e: AXUIElement) -> AXUIElement? {
-    var cur: AXUIElement? = e
+@MainActor
+func isCloseButton(_ el: AXUIElement) -> Bool {
+    if let subrole = attributeString(el, kAXSubroleAttribute as CFString) { return subrole == "AXCloseButton" }
+    return false
+}
+
+@MainActor
+func isWindow(_ el: AXUIElement) -> Bool {
+    if let role = attributeString(el, kAXRoleAttribute as CFString) { return role == "AXWindow" }
+    return false
+}
+
+@MainActor
+func ancestorWindow(from el: AXUIElement) -> AXUIElement? {
+    var current: AXUIElement? = el
     var guardCount = 0
-    while let c = cur, guardCount < 32 {
-        if stringAttr(c, kAXRoleAttribute as CFString) == "AXWindow" { return c }
-        cur = parent(c)
+    while let c = current, guardCount < 32 {
+        if isWindow(c) { return c }
+        current = attributeElement(c, kAXParentAttribute as CFString)
         guardCount += 1
     }
     return nil
 }
 
-func windowCenter(_ w: AXUIElement) -> CGPoint? {
-    var posVal: CFTypeRef?
-    var sizeVal: CFTypeRef?
-    if AXUIElementCopyAttributeValue(w, kAXPositionAttribute as CFString, &posVal) != .success { return nil }
-    if AXUIElementCopyAttributeValue(w, kAXSizeAttribute as CFString, &sizeVal) != .success { return nil }
-    var pos = CGPoint.zero
-    var size = CGSize.zero
-    let pv = posVal as! AXValue
-    let sv = sizeVal as! AXValue
-    if AXValueGetType(pv) == .cgPoint, AXValueGetValue(pv, .cgPoint, &pos),
-       AXValueGetType(sv) == .cgSize, AXValueGetValue(sv, .cgSize, &size) {
-        return CGPoint(x: pos.x + size.width / 2.0, y: pos.y + size.height / 2.0)
+@MainActor
+func findCloseButtonAncestor(_ el: AXUIElement) -> AXUIElement? {
+    var current: AXUIElement? = el
+    var guardCount = 0
+    while let c = current, guardCount < 32 {
+        if isCloseButton(c) { return c }
+        current = attributeElement(c, kAXParentAttribute as CFString)
+        guardCount += 1
     }
     return nil
 }
 
-func visibleFrameForPoint(_ p: CGPoint) -> NSRect? {
-    let screens = NSScreen.screens
-    var found: NSScreen?
-    for s in screens { if s.frame.contains(p) { found = s; break } }
-    if found == nil { found = NSScreen.main }
-    guard let screen = found else { return nil }
-    return screen.visibleFrame
+@MainActor
+func enclosingWindow(of e: AXUIElement) -> AXUIElement? {
+    var cur: AXUIElement? = e
+    var guardCount = 0
+    while let c = cur, guardCount < 32 {
+        if attributeString(c, kAXRoleAttribute as CFString) == "AXWindow" { return c }
+        cur = attributeElement(c, kAXParentAttribute as CFString)
+        guardCount += 1
+    }
+    return nil
 }
 
-func convertNSRectToAX(_ r: NSRect) -> (CGPoint, CGSize) {
-    let maxY = NSScreen.screens.map { $0.frame.maxY }.max() ?? 0
-    let axY = maxY - (r.origin.y + r.size.height)
-    return (CGPoint(x: r.origin.x, y: axY), CGSize(width: r.size.width, height: r.size.height))
-}
-
-func setWindow(_ w: AXUIElement, to rect: NSRect) -> Bool {
-    let (p, s) = convertNSRectToAX(rect)
-    var pos = p
-    var size = s
-    guard let pv = AXValueCreate(.cgPoint, &pos), let sv = AXValueCreate(.cgSize, &size) else { return false }
-    let r1 = AXUIElementSetAttributeValue(w, kAXPositionAttribute as CFString, pv)
-    let r2 = AXUIElementSetAttributeValue(w, kAXSizeAttribute as CFString, sv)
-    return r1 == .success && r2 == .success
+@MainActor
+func synthesizeAltClick(at p: CGPoint) {
+    let optDown = CGEvent(keyboardEventSource: nil, virtualKey: 58, keyDown: true)
+    optDown?.post(tap: .cghidEventTap)
+    let down = CGEvent(mouseEventSource: nil, mouseType: .leftMouseDown, mouseCursorPosition: p, mouseButton: .left)
+    down?.flags = [.maskAlternate]
+    down?.post(tap: .cghidEventTap)
+    let up = CGEvent(mouseEventSource: nil, mouseType: .leftMouseUp, mouseCursorPosition: p, mouseButton: .left)
+    up?.flags = [.maskAlternate]
+    up?.post(tap: .cghidEventTap)
+    let optUp = CGEvent(keyboardEventSource: nil, virtualKey: 58, keyDown: false)
+    optUp?.post(tap: .cghidEventTap)
 }

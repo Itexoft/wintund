@@ -1,7 +1,7 @@
 import Foundation
 import AppKit
 @preconcurrency import ApplicationServices
-import CoreGraphics
+@preconcurrency import CoreGraphics
 
 @MainActor
 func handleEvent(type: CGEventType, event: CGEvent) -> Unmanaged<CGEvent>? {
@@ -19,24 +19,14 @@ func handleEvent(type: CGEventType, event: CGEvent) -> Unmanaged<CGEvent>? {
         return Unmanaged.passUnretained(event)
     }
     if type == .leftMouseUp {
+        if Globals.swallowPlainUp && !event.flags.contains(.maskAlternate) { Globals.swallowPlainUp = false; return nil }
         if Globals.swallowNextUp { Globals.swallowNextUp = false; return nil }
         if Globals.swallowMouseUp { Globals.swallowMouseUp = false; return nil }
-        return Unmanaged.passUnretained(event)
-    }
-    if type == .rightMouseDown {
-        if Globals.globalConfig.enableClockCleaner {
-            if clockRightMouseDown(event) == nil { return nil }
-        }
-        return Unmanaged.passUnretained(event)
-    }
-    if type == .rightMouseUp {
-        if Globals.swallowNextMouseUp { Globals.swallowNextMouseUp = false; return nil }
         return Unmanaged.passUnretained(event)
     }
     return Unmanaged.passUnretained(event)
 }
 
-@convention(c)
-func eventCallback(proxy: CGEventTapProxy, type: CGEventType, event: CGEvent, refcon: UnsafeMutableRawPointer?) -> Unmanaged<CGEvent>? {
-    return MainActor.assumeIsolated { handleEvent(type: type, event: event) }
+let eventCallback: CGEventTapCallBack = { _, type, event, _ in
+    MainActor.assumeIsolated { handleEvent(type: type, event: event) }
 }
