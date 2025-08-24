@@ -1,14 +1,19 @@
 import Foundation
-import AppKit
 @preconcurrency import ApplicationServices
 @preconcurrency import CoreGraphics
-import Dispatch
 
 @main
 struct Main {
     @MainActor static func main() {
         let key = kAXTrustedCheckOptionPrompt.takeUnretainedValue() as CFString
-        _ = AXIsProcessTrustedWithOptions([key: true] as CFDictionary)
+        guard AXIsProcessTrustedWithOptions([key: true] as CFDictionary) else {
+            fputs("accessibility permission missing\n", stderr)
+            exit(1)
+        }
+        if !CGPreflightListenEventAccess() && !CGRequestListenEventAccess() {
+            fputs("input monitoring permission missing\n", stderr)
+            exit(1)
+        }
         let mask: CGEventMask =
             (CGEventMask(1) << CGEventType.leftMouseDown.rawValue) |
             (CGEventMask(1) << CGEventType.leftMouseUp.rawValue)

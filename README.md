@@ -13,6 +13,10 @@ Swift utility providing desktop tweaks for macOS.
 
 Edit `config.ini` next to the executable to enable or disable tweaks and adjust parameters.
 
+## Permissions
+
+The application requires Accessibility and Input Monitoring permissions.
+
 ## Build
 
 ```

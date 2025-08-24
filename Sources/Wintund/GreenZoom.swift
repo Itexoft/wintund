@@ -1,4 +1,3 @@
-import AppKit
 @preconcurrency import ApplicationServices
 @preconcurrency import CoreGraphics
 

@@ -1,5 +1,4 @@
 import Foundation
-import AppKit
 
 struct Ini { var sections: [String: [String: String]] }
 
