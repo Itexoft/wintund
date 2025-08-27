@@ -78,6 +78,12 @@ func findCloseButtonAncestor(_ el: AXUIElement) -> AXUIElement? {
 }
 
 @MainActor
+func windowForCloseButton(_ el: AXUIElement) -> AXUIElement? {
+    if let w = attributeElement(el, kAXWindowAttribute as CFString) { return w }
+    return ancestorWindow(from: el)
+}
+
+@MainActor
 func enclosingWindow(of e: AXUIElement) -> AXUIElement? {
     var cur: AXUIElement? = e
     var guardCount = 0

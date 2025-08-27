@@ -50,7 +50,7 @@ func hideApp(for win: AXUIElement) -> Bool {
 @MainActor
 func handleLeftMouseDown(_ event: CGEvent) -> Unmanaged<CGEvent>? {
     let loc = event.location
-    if let el = elementAtPoint(loc), let closeEl = findCloseButtonAncestor(el), let win = ancestorWindow(from: closeEl) {
+    if let el = elementAtPoint(loc), let closeEl = findCloseButtonAncestor(el), let win = windowForCloseButton(closeEl) {
         if isSeriousWindow(win) {
             if hideApp(for: win) { Globals.swallowNextUp = true; return nil }
         }
